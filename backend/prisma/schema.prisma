@@ -1,0 +1,181 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum SeatCategory {
+  STANDARD
+  PREMIUM
+  VIP
+  BALCONY
+  BOX
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  name          String
+  phone         String?   @unique
+  password_hash String
+  role          Role      @default(USER)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  bookings   Booking[]
+  audit_logs AuditLog[]
+
+  @@map("users")
+}
+
+model Movie {
+  id               Int       @id @default(autoincrement())
+  title            String
+  duration_minutes Int
+  language         String
+  genre            String[]
+  poster_url       String?
+  description      String?
+  is_active        Boolean   @default(true)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  shows Show[]
+
+  @@map("movies")
+}
+
+model Hall {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  total_seats Int
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  seats Seat[]
+  shows Show[]
+
+  @@map("halls")
+}
+
+model Seat {
+  id            Int          @id @default(autoincrement())
+  hall_id       Int
+  row_number    String
+  seat_number   Int
+  seat_category SeatCategory
+  is_active     Boolean      @default(true)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  hall          Hall           @relation(fields: [hall_id], references: [id], onDelete: Cascade)
+  booking_seats BookingSeat[]
+
+  @@unique([hall_id, row_number, seat_number])
+  @@index([hall_id])
+  @@index([seat_category])
+  @@map("seats")
+}
+
+model Show {
+  id            Int       @id @default(autoincrement())
+  movie_id      Int
+  hall_id       Int
+  show_datetime DateTime
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  movie         Movie          @relation(fields: [movie_id], references: [id], onDelete: Cascade)
+  hall          Hall           @relation(fields: [hall_id], references: [id], onDelete: Cascade)
+  bookings      Booking[]
+  booking_seats BookingSeat[]
+  seat_pricings SeatPricing[]
+
+  @@index([show_datetime])
+  @@index([movie_id])
+  @@index([hall_id])
+  @@map("shows")
+}
+
+model SeatPricing {
+  id            Int          @id @default(autoincrement())
+  show_id       Int
+  seat_category SeatCategory
+  price         Decimal      @db.Decimal(10, 2)
+
+  show Show @relation(fields: [show_id], references: [id], onDelete: Cascade)
+
+  @@unique([show_id, seat_category])
+  @@map("seat_pricings")
+}
+
+model Booking {
+  id           Int           @id @default(autoincrement())
+  user_id      Int
+  show_id      Int
+  total_amount Decimal       @db.Decimal(10, 2)
+  status       BookingStatus @default(CONFIRMED)
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+
+  user          User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  show          Show          @relation(fields: [show_id], references: [id], onDelete: Cascade)
+  booking_seats BookingSeat[]
+
+  @@index([user_id])
+  @@index([show_id])
+  @@map("bookings")
+}
+
+model BookingSeat {
+  id         Int @id @default(autoincrement())
+  booking_id Int
+  seat_id    Int
+  show_id    Int
+
+  booking Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  seat    Seat    @relation(fields: [seat_id], references: [id], onDelete: Cascade)
+  show    Show    @relation(fields: [show_id], references: [id], onDelete: Cascade)
+
+  @@unique([show_id, seat_id])
+  @@index([show_id])
+  @@index([seat_id])
+  @@index([booking_id])
+  @@map("booking_seats")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  user_id     Int?
+  action      String
+  entity_type String
+  entity_id   String?
+  ip_address  String?
+  metadata    Json?
+  created_at  DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([entity_type])
+  @@index([created_at])
+  @@map("audit_logs")
+}

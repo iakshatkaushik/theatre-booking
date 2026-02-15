@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Booking confirmation — CineVerse Theatre">
+  <title>Booking Confirmed — CineVerse Theatre</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <section class="section">
+    <div class="container">
+      <div class="card checkout-card" id="checkout-content">
+        <div class="loading-overlay"><div class="spinner"></div><p>Loading booking details...</p></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="footer"></div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    document.getElementById('navbar').innerHTML = renderNavbar('');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    function loadBooking() {
+      const bookingStr = localStorage.getItem('last_booking');
+      if (!bookingStr) {
+        document.getElementById('checkout-content').innerHTML = `
+          <div class="empty-state">
+            <div class="icon">🎫</div>
+            <p>No booking found</p>
+            <a href="/shows.html" class="btn btn-primary mt-3">Browse Shows</a>
+          </div>
+        `;
+        return;
+      }
+
+      const booking = JSON.parse(bookingStr);
+      const seats = booking.booking_seats || [];
+
+      document.getElementById('checkout-content').innerHTML = `
+        <div class="text-center mb-3">
+          <div style="font-size:4rem;margin-bottom:12px">🎉</div>
+          <h1 style="font-family:'Playfair Display',serif;color:var(--accent-gold);font-size:2rem">Booking Confirmed!</h1>
+          <p class="text-muted mt-1">Your tickets have been booked successfully</p>
+        </div>
+
+        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:20px;margin-bottom:20px">
+          <div class="checkout-item">
+            <span class="text-muted">Booking ID</span>
+            <span style="font-weight:600;color:var(--accent-gold)">#${booking.id}</span>
+          </div>
+          <div class="checkout-item">
+            <span class="text-muted">Movie</span>
+            <span>${booking.show?.movie?.title || 'N/A'}</span>
+          </div>
+          <div class="checkout-item">
+            <span class="text-muted">Hall</span>
+            <span>${booking.show?.hall?.name || 'N/A'}</span>
+          </div>
+          <div class="checkout-item">
+            <span class="text-muted">Show Time</span>
+            <span>${booking.show ? formatTime(booking.show.show_datetime) + ', ' + formatDate(booking.show.show_datetime) : 'N/A'}</span>
+          </div>
+          <div class="checkout-item">
+            <span class="text-muted">Status</span>
+            <span class="status-badge confirmed">✓ ${booking.status}</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">Seats (${seats.length})</p>
+          <div class="checkout-seats">
+            ${seats.map(bs => `
+              <span class="checkout-seat-tag">
+                ${bs.seat?.row_number || ''}${bs.seat?.seat_number || ''} 
+                <small>(${bs.seat?.seat_category || ''})</small>
+              </span>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="summary-total" style="border-top:2px solid var(--border-color);padding-top:16px">
+          <span style="font-size:1.1rem">Total Paid</span>
+          <span class="amount" style="font-size:1.4rem;color:var(--accent-gold)">${formatCurrency(booking.total_amount)}</span>
+        </div>
+
+        <div class="flex-center gap-2 mt-4">
+          <a href="/dashboard.html" class="btn btn-primary">View My Bookings</a>
+          <a href="/shows.html" class="btn btn-secondary">Book More Tickets</a>
+        </div>
+      `;
+    }
+
+    loadBooking();
+  </script>
+</body>
+</html>

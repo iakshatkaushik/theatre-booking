@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Select your seats for the show at CineVerse Theatre.">
+  <title>Select Seats — CineVerse Theatre</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <section class="section">
+    <div class="container">
+      <div id="show-info" class="mb-3">
+        <div class="loading-overlay"><div class="spinner"></div><p>Loading seat map...</p></div>
+      </div>
+
+      <div class="two-col" id="seat-layout" style="display:none">
+        <!-- Left: Seat Map -->
+        <div>
+          <div class="seat-map-container">
+            <div class="screen"></div>
+            <div id="seat-map"></div>
+          </div>
+
+          <div class="seat-legend">
+            <div class="seat-legend-item"><div class="seat-legend-dot" style="background:var(--seat-available)"></div> Available</div>
+            <div class="seat-legend-item"><div class="seat-legend-dot" style="background:var(--seat-selected)"></div> Selected</div>
+            <div class="seat-legend-item"><div class="seat-legend-dot" style="background:var(--seat-booked)"></div> Booked</div>
+            <div class="seat-legend-item"><div class="seat-legend-dot" style="background:var(--seat-disabled)"></div> Unavailable</div>
+          </div>
+        </div>
+
+        <!-- Right: Summary -->
+        <div>
+          <div class="booking-summary" id="booking-summary">
+            <h3 style="font-family:'Playfair Display',serif;color:var(--accent-gold);margin-bottom:16px">Booking Summary</h3>
+            <div id="summary-movie"></div>
+            <div id="summary-show"></div>
+            <hr style="border-color:var(--border-color);margin:12px 0">
+            <div id="summary-seats">
+              <p class="text-muted" style="font-size:0.85rem">Select seats to continue</p>
+            </div>
+            <div id="summary-total" style="display:none">
+              <div class="summary-total">
+                <span>Total</span>
+                <span class="amount" id="total-amount">₹0</span>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-lg mt-3" style="width:100%" id="proceed-btn" disabled onclick="proceedToCheckout()">
+              Select Seats to Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="footer"></div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    document.getElementById('navbar').innerHTML = renderNavbar('');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const showId = parseInt(urlParams.get('show_id'));
+
+    if (!showId) {
+      document.getElementById('show-info').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>No show selected. <a href="/shows.html">Browse shows</a></p></div>';
+    }
+
+    let showData = null;
+    let selectedSeats = [];
+    let pricingMap = {};
+
+    async function loadSeats() {
+      if (!showId) return;
+      try {
+        const res = await Api.getShowSeats(showId);
+        showData = res.data;
+        pricingMap = showData.pricing;
+
+        // Show info
+        document.getElementById('show-info').innerHTML = `
+          <h1 class="section-title">${showData.show.movie.title}</h1>
+          <p class="section-subtitle">
+            🏛️ ${showData.show.hall.name} &nbsp;|&nbsp;
+            📅 ${formatDate(showData.show.show_datetime)} &nbsp;|&nbsp;
+            🕐 ${formatTime(showData.show.show_datetime)} &nbsp;|&nbsp;
+            ⏱️ ${showData.show.movie.duration_minutes} min
+          </p>
+        `;
+
+        document.getElementById('summary-movie').innerHTML = `
+          <div class="summary-row"><span class="text-muted">Movie</span><span>${showData.show.movie.title}</span></div>
+        `;
+        document.getElementById('summary-show').innerHTML = `
+          <div class="summary-row"><span class="text-muted">Show</span><span>${formatTime(showData.show.show_datetime)}, ${formatDate(showData.show.show_datetime)}</span></div>
+          <div class="summary-row"><span class="text-muted">Hall</span><span>${showData.show.hall.name}</span></div>
+        `;
+
+        // Build seat map grouped by row
+        const seats = showData.seats;
+        const rows = {};
+        seats.forEach(s => {
+          if (!rows[s.row_number]) rows[s.row_number] = [];
+          rows[s.row_number].push(s);
+        });
+
+        let mapHtml = '';
+        Object.keys(rows).sort().forEach(rowLabel => {
+          const rowSeats = rows[rowLabel].sort((a, b) => a.seat_number - b.seat_number);
+          mapHtml += `<div class="seat-row">`;
+          mapHtml += `<span class="seat-row-label">${rowLabel}</span>`;
+          rowSeats.forEach(seat => {
+            let cls = 'available';
+            if (seat.is_booked) cls = 'booked';
+            if (!seat.is_booked && selectedSeats.find(s => s.id === seat.id)) cls = 'selected';
+
+            mapHtml += `
+              <div class="seat ${cls}" 
+                   data-seat-id="${seat.id}" 
+                   data-category="${seat.seat_category}"
+                   data-price="${seat.price}"
+                   title="${rowLabel}${seat.seat_number} - ${seat.seat_category} (${formatCurrency(seat.price)})"
+                   onclick="${!seat.is_booked ? `toggleSeat(${seat.id}, '${rowLabel}', ${seat.seat_number}, '${seat.seat_category}', ${seat.price})` : ''}"
+              >${seat.seat_number}</div>
+            `;
+          });
+          mapHtml += `<span class="seat-row-label">${rowLabel}</span>`;
+          mapHtml += `</div>`;
+        });
+
+        document.getElementById('seat-map').innerHTML = mapHtml;
+        document.getElementById('seat-layout').style.display = 'grid';
+
+      } catch (err) {
+        document.getElementById('show-info').innerHTML = `<div class="empty-state"><div class="icon">❌</div><p>${err.message || 'Failed to load seats'}</p></div>`;
+      }
+    }
+
+    function toggleSeat(id, row, num, category, price) {
+      if (!Api.isLoggedIn()) {
+        showAuthModal('login');
+        Toast.warning('Please login to book seats');
+        return;
+      }
+
+      const idx = selectedSeats.findIndex(s => s.id === id);
+      if (idx >= 0) {
+        selectedSeats.splice(idx, 1);
+      } else {
+        if (selectedSeats.length >= 10) {
+          Toast.warning('Maximum 10 seats per booking');
+          return;
+        }
+        selectedSeats.push({ id, row, num, category, price });
+      }
+      updateSeatUI();
+      updateSummary();
+    }
+
+    function updateSeatUI() {
+      document.querySelectorAll('.seat.available, .seat.selected').forEach(el => {
+        const seatId = parseInt(el.dataset.seatId);
+        if (selectedSeats.find(s => s.id === seatId)) {
+          el.className = 'seat selected';
+        } else {
+          el.className = 'seat available';
+        }
+      });
+    }
+
+    function updateSummary() {
+      if (selectedSeats.length === 0) {
+        document.getElementById('summary-seats').innerHTML = '<p class="text-muted" style="font-size:0.85rem">Select seats to continue</p>';
+        document.getElementById('summary-total').style.display = 'none';
+        document.getElementById('proceed-btn').disabled = true;
+        document.getElementById('proceed-btn').textContent = 'Select Seats to Continue';
+        return;
+      }
+
+      let total = 0;
+      let seatsHtml = selectedSeats.map(s => {
+        total += s.price;
+        return `<div class="summary-row"><span>${s.row}${s.num} <small class="text-muted">(${s.category})</small></span><span>${formatCurrency(s.price)}</span></div>`;
+      }).join('');
+
+      document.getElementById('summary-seats').innerHTML = `
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">${selectedSeats.length} seat(s) selected</p>
+        ${seatsHtml}
+      `;
+      document.getElementById('summary-total').style.display = 'block';
+      document.getElementById('total-amount').textContent = formatCurrency(total);
+      document.getElementById('proceed-btn').disabled = false;
+      document.getElementById('proceed-btn').textContent = `Book ${selectedSeats.length} Seat(s) — ${formatCurrency(total)}`;
+    }
+
+    async function proceedToCheckout() {
+      if (selectedSeats.length === 0) return;
+      if (!Api.isLoggedIn()) {
+        showAuthModal('login');
+        return;
+      }
+
+      const btn = document.getElementById('proceed-btn');
+      btn.disabled = true;
+      btn.textContent = 'Booking...';
+
+      try {
+        const res = await Api.createBooking({
+          show_id: showId,
+          seat_ids: selectedSeats.map(s => s.id),
+        });
+
+        Toast.success('🎉 Booking confirmed!');
+        
+        // Store booking for checkout page
+        localStorage.setItem('last_booking', JSON.stringify(res.data));
+        window.location.href = '/checkout.html';
+      } catch (err) {
+        Toast.error(err.message || 'Booking failed');
+        btn.disabled = false;
+        btn.textContent = `Book ${selectedSeats.length} Seat(s)`;
+        // Refresh seats in case of conflict
+        selectedSeats = [];
+        loadSeats();
+      }
+    }
+
+    loadSeats();
+  </script>
+</body>
+</html>

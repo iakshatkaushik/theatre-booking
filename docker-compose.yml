@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL Database ────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: theatre_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-theatre_db}
+      POSTGRES_USER: ${POSTGRES_USER:-theatre_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-theatre_pass_2025}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-theatre_user} -d ${POSTGRES_DB:-theatre_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend + Frontend App ─────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: theatre_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-theatre_user}:${POSTGRES_PASSWORD:-theatre_pass_2025}@db:5432/${POSTGRES_DB:-theatre_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_change_in_production_2025}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - applogs:/app/logs
+
+volumes:
+  pgdata:
+    driver: local
+  applogs:
+    driver: local

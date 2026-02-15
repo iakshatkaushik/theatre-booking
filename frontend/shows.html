@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="View available show timings at CineVerse Theatre. Filter by date and movie.">
+  <title>Show Times — CineVerse Theatre</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <section class="section">
+    <div class="container">
+      <h1 class="section-title">🕐 Show Times</h1>
+      <p class="section-subtitle">Select a date to see available shows</p>
+
+      <!-- Date Strip -->
+      <div class="date-strip" id="date-strip"></div>
+
+      <!-- Shows -->
+      <div class="show-list" id="show-list">
+        <div class="loading-overlay" style="grid-column:1/-1"><div class="spinner"></div><p>Loading shows...</p></div>
+      </div>
+
+      <div id="pagination"></div>
+    </div>
+  </section>
+
+  <div id="footer"></div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    document.getElementById('navbar').innerHTML = renderNavbar('shows');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterMovieId = urlParams.get('movie_id');
+    let selectedDate = null;
+    let currentPage = 1;
+
+    // Generate date strip (7 days)
+    function buildDateStrip() {
+      const strip = document.getElementById('date-strip');
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+      let html = '';
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const isActive = i === 0 ? 'active' : '';
+        html += `
+          <div class="date-item ${isActive}" data-date="${dateStr}" onclick="selectDate('${dateStr}', this)">
+            <div class="day">${days[d.getDay()]}</div>
+            <div class="num">${d.getDate()}</div>
+            <div class="month">${months[d.getMonth()]}</div>
+          </div>
+        `;
+        if (i === 0) selectedDate = dateStr;
+      }
+      strip.innerHTML = html;
+    }
+
+    function selectDate(date, el) {
+      selectedDate = date;
+      document.querySelectorAll('.date-item').forEach(d => d.classList.remove('active'));
+      el.classList.add('active');
+      currentPage = 1;
+      loadShows();
+    }
+
+    async function loadShows(page) {
+      if (page) currentPage = page;
+      const params = { page: currentPage, limit: 12 };
+      if (selectedDate) params.date = selectedDate;
+      if (filterMovieId) params.movie_id = filterMovieId;
+
+      try {
+        const res = await Api.getShows(params);
+        const shows = res.data;
+
+        if (!shows || shows.length === 0) {
+          document.getElementById('show-list').innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="icon">🕐</div><p>No shows available for this date</p></div>';
+          document.getElementById('pagination').innerHTML = '';
+          return;
+        }
+
+        document.getElementById('show-list').innerHTML = shows.map(s => {
+          const showTime = formatTime(s.show_datetime);
+          const showDate = formatDate(s.show_datetime);
+          const pricings = s.seat_pricings || [];
+
+          return `
+            <div class="card show-card" onclick="window.location.href='/seats.html?show_id=${s.id}'">
+              <div class="show-time">${showTime}</div>
+              <div class="show-date">${showDate}</div>
+              <h3 style="font-size:1rem;margin-bottom:8px">${s.movie?.title || 'Movie'}</h3>
+              <div class="movie-meta">
+                <span class="movie-badge language">${s.movie?.language || ''}</span>
+                <span class="movie-badge duration">${s.movie?.duration_minutes || '?'} min</span>
+              </div>
+              <div class="show-hall">🏛️ ${s.hall?.name || 'Hall'}</div>
+              <div class="show-pricing">
+                ${pricings.map(p => `<span class="price-tag">${p.seat_category}: ${formatCurrency(p.price)}</span>`).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('pagination').innerHTML = renderPagination(res.pagination, 'loadShows');
+      } catch (err) {
+        document.getElementById('show-list').innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Failed to load shows</p></div>';
+      }
+    }
+
+    buildDateStrip();
+    loadShows();
+  </script>
+</body>
+</html>

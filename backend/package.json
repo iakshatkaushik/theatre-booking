@@ -1,0 +1,45 @@
+{
+  "name": "theatre-management-system",
+  "version": "1.0.0",
+  "description": "Production-ready Theatre Management System with Node.js, Express, and PostgreSQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate dev --name init",
+    "prisma:deploy": "npx prisma migrate deploy",
+    "prisma:studio": "npx prisma studio",
+    "seed": "node prisma/seed.js",
+    "setup": "npx prisma generate && npx prisma migrate dev --name init && node prisma/seed.js"
+  },
+  "keywords": [
+    "theatre",
+    "cinema",
+    "booking",
+    "management"
+  ],
+  "author": "Akshat Kaushik",
+  "license": "MIT",
+  "type": "commonjs",
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "winston": "^3.19.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11",
+    "prisma": "^6.19.2"
+  }
+}

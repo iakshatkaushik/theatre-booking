@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CineVerse Theatre — Book movie tickets online with the best cinema experience. Browse shows, select seats, and enjoy the magic of film.">
+  <title>CineVerse Theatre — Book Movie Tickets</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="particles"></div>
+  <div id="navbar"></div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">Experience Cinema<br>Like Never Before</h1>
+      <p class="hero-subtitle">
+        Immerse yourself in the magic of film at CineVerse. Browse blockbusters, pick your perfect seats, and enjoy a world-class theatre experience — all at your fingertips.
+      </p>
+      <div class="hero-cta">
+        <a href="/movies.html" class="btn btn-primary btn-lg">🎬 Browse Movies</a>
+        <a href="/shows.html" class="btn btn-secondary btn-lg">🕐 View Shows</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Movies -->
+  <section class="section" style="padding-top: 40px;">
+    <div class="container">
+      <h2 class="section-title text-center">Now Showing</h2>
+      <p class="section-subtitle text-center">Catch the latest blockbusters and timeless classics</p>
+      <div class="movie-grid" id="featured-movies">
+        <div class="loading-overlay"><div class="spinner"></div><p>Loading movies...</p></div>
+      </div>
+      <div class="text-center mt-4">
+        <a href="/movies.html" class="btn btn-secondary">View All Movies →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+      <div class="dashboard-grid">
+        <div class="card stat-card">
+          <div class="stat-value">5</div>
+          <div class="stat-label">Premium Auditoriums</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value">580+</div>
+          <div class="stat-label">Luxurious Seats</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value">8+</div>
+          <div class="stat-label">Movies Playing</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-value">24/7</div>
+          <div class="stat-label">Online Booking</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="footer"></div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // Init
+    document.getElementById('navbar').innerHTML = renderNavbar('home');
+    document.getElementById('footer').innerHTML = renderFooter();
+    initParticles();
+
+    // Load featured movies
+    async function loadFeatured() {
+      try {
+        const res = await Api.getMovies({ limit: 4 });
+        const movies = res.data;
+        if (!movies || movies.length === 0) {
+          document.getElementById('featured-movies').innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No movies available right now</p></div>';
+          return;
+        }
+
+        const movieIcons = ['🎬', '🎥', '🎞️', '🎭', '🌟', '🔥', '💫', '⭐'];
+        document.getElementById('featured-movies').innerHTML = movies.map((m, idx) => `
+          <div class="card movie-card" onclick="window.location.href='/shows.html?movie_id=${m.id}'">
+            <div class="movie-poster">${movieIcons[idx % movieIcons.length]}</div>
+            <div class="movie-info">
+              <h3 class="movie-title">${m.title}</h3>
+              <div class="movie-meta">
+                ${m.genre?.map(g => `<span class="movie-badge">${g}</span>`).join('') || ''}
+                <span class="movie-badge language">${m.language}</span>
+                <span class="movie-badge duration">${m.duration_minutes} min</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('featured-movies').innerHTML = '<div class="empty-state"><p>Failed to load movies</p></div>';
+      }
+    }
+
+    loadFeatured();
+  </script>
+</body>
+</html>
